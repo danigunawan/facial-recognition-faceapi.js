@@ -1,0 +1,573 @@
+<head>
+    <script src="face-api.js"></script>
+    <script>
+    async function requestExternalImage(imageUrl) {
+    const res = await fetch(imageUrl, {
+      method: 'GET',
+      mode: 'cors',
+    headers: {
+      'Access-Control-Allow-Origin':'*',
+        'content-type': 'application/json'
+      }
+    })
+    if (!(res.status < 400)) {
+      console.error(res.status + ' : ' + await res.text())
+      throw new Error('failed to fetch image from url: ' + imageUrl)
+    }
+  
+    let blob
+    try {
+      blob = await res.blob()
+      return await faceapi.bufferToImage(blob)
+    } catch (e) {
+      console.error('received blob:', blob)
+      console.error('error:', e)
+      throw new Error('failed to load image from url: ' + imageUrl)
+    }
+  }
+  
+  function renderNavBar(navbarId, exampleUri) {
+    const examples = [
+      {
+        uri: 'face_detection',
+        name: 'Face Detection'
+      },
+      {
+        uri: 'face_landmark_detection',
+        name: 'Face Landmark Detection'
+      },
+      {
+        uri: 'face_expression_recognition',
+        name: 'Face Expression Recognition'
+      },
+      {
+        uri: 'face_recognition',
+        name: 'Face Recognition'
+      },
+      {
+        uri: 'face_extraction',
+        name: 'Face Extraction'
+      },
+      {
+        uri: 'video_face_tracking',
+        name: 'Video Face Tracking'
+      },
+      {
+        uri: 'webcam_face_detection',
+        name: 'Webcam Face Detection'
+      },
+      {
+        uri: 'webcam_face_landmark_detection',
+        name: 'Webcam Face Landmark Detection'
+      },
+      {
+        uri: 'webcam_face_expression_recognition',
+        name: 'Webcam Face Expression Recognition'
+      },
+      {
+        uri: 'bbt_face_landmark_detection',
+        name: 'BBT Face Landmark Detection'
+      },
+      {
+        uri: 'bbt_face_similarity',
+        name: 'BBT Face Similarity'
+      },
+      {
+        uri: 'bbt_face_matching',
+        name: 'BBT Face Matching'
+      },
+      {
+        uri: 'bbt_face_recognition',
+        name: 'BBT Face Recognition'
+      },
+      {
+        uri: 'batch_face_landmarks',
+        name: 'Batch Face Landmark Detection'
+      },
+      {
+        uri: 'batch_face_recognition',
+        name: 'Batch Face Recognition'
+      }
+    ]
+  
+    const navbar = $(navbarId).get(0)
+    const pageContainer = $('.page-container').get(0)
+  
+    const header = document.createElement('h3')
+    header.innerHTML = examples.find(ex => ex.uri === exampleUri).name
+    pageContainer.insertBefore(header, pageContainer.children[0])
+  
+    const menuContent = document.createElement('ul')
+    menuContent.id = 'slide-out'
+    menuContent.classList.add('side-nav', 'fixed')
+    navbar.appendChild(menuContent)
+  
+    const menuButton = document.createElement('a')
+    menuButton.href='#'
+    menuButton.classList.add('button-collapse', 'show-on-large')
+    menuButton.setAttribute('data-activates', 'slide-out')
+    const menuButtonIcon = document.createElement('img')
+    menuButtonIcon.src = 'menu_icon.png'
+    menuButton.appendChild(menuButtonIcon)
+    navbar.appendChild(menuButton)
+  
+    const li = document.createElement('li')
+    const githubLink = document.createElement('a')
+    githubLink.classList.add('waves-effect', 'waves-light', 'side-by-side')
+    githubLink.id = 'github-link'
+    githubLink.href = 'https://github.com/justadudewhohacks/face-api.js'
+    const h5 = document.createElement('h5')
+    h5.innerHTML = 'face-api.js'
+    githubLink.appendChild(h5)
+    const githubLinkIcon = document.createElement('img')
+    githubLinkIcon.src = 'github_link_icon.png'
+    githubLink.appendChild(githubLinkIcon)
+    li.appendChild(githubLink)
+    menuContent.appendChild(li)
+  
+    examples
+      .forEach(ex => {
+        const li = document.createElement('li')
+        if (ex.uri === exampleUri) {
+          li.style.background='#b0b0b0'
+        }
+        const a = document.createElement('a')
+        a.classList.add('waves-effect', 'waves-light', 'pad-sides-sm')
+        a.href = ex.uri
+        const span = document.createElement('span')
+        span.innerHTML = ex.name
+        span.style.whiteSpace = 'nowrap'
+        a.appendChild(span)
+        li.appendChild(a)
+        menuContent.appendChild(li)
+      })
+  
+    $('.button-collapse').sideNav({
+      menuWidth: 260
+    })
+  }
+  
+  function renderSelectList(selectListId, onChange, initialValue, renderChildren) {
+    const select = document.createElement('select')
+    $(selectListId).get(0).appendChild(select)
+    renderChildren(select)
+    $(select).val(initialValue)
+    $(select).on('change', (e) => onChange(e.target.value))
+    $(select).material_select()
+  }
+  
+  function renderOption(parent, text, value) {
+    const option = document.createElement('option')
+    option.innerHTML = text
+    option.value = value
+    parent.appendChild(option)
+  }
+    </script>
+    <script>
+    function resizeCanvasAndResults(dimensions, canvas, results) {
+    const { width, height } = dimensions instanceof HTMLVideoElement
+      ? faceapi.getMediaDimensions(dimensions)
+      : dimensions
+    canvas.width = width
+    canvas.height = height
+  
+    // resize detections (and landmarks) in case displayed image is smaller than
+    // original size
+    return faceapi.resizeResults(results, { width, height })
+  }
+  
+  function drawDetections(dimensions, canvas, detections) {
+    const resizedDetections = resizeCanvasAndResults(dimensions, canvas, detections)
+    faceapi.drawDetection(canvas, resizedDetections)
+  }
+  
+  function drawLandmarks(dimensions, canvas, results, withBoxes = true) {
+    const resizedResults = resizeCanvasAndResults(dimensions, canvas, results)
+  
+    if (withBoxes) {
+      faceapi.drawDetection(canvas, resizedResults.map(det => det.detection))
+    }
+  
+    const faceLandmarks = resizedResults.map(det => det.landmarks)
+    const drawLandmarksOptions = {
+      lineWidth: 2,
+      drawLines: true,
+      color: 'green'
+    }
+    faceapi.drawLandmarks(canvas, faceLandmarks, drawLandmarksOptions)
+  }
+  
+  function drawExpressions(dimensions, canvas, results, thresh, withBoxes = true) {
+    const resizedResults = resizeCanvasAndResults(dimensions, canvas, results)
+  
+    if (withBoxes) {
+      faceapi.drawDetection(canvas, resizedResults.map(det => det.detection), { withScore: false })
+    }
+  
+    faceapi.drawFaceExpressions(canvas, resizedResults.map(({ detection, expressions }) => ({ position: detection.box, expressions })))
+  }
+    </script>
+    <script>
+    const SSD_MOBILENETV1 = 'ssd_mobilenetv1'
+  const TINY_FACE_DETECTOR = 'tiny_face_detector'
+  const MTCNN = 'mtcnn'
+  
+  
+  let selectedFaceDetector = SSD_MOBILENETV1
+  
+  // ssd_mobilenetv1 options
+  let minConfidence = 0.5
+  
+  // tiny_face_detector options
+  let inputSize = 512
+  let scoreThreshold = 0.5
+  
+  //mtcnn options
+  let minFaceSize = 20
+  
+  function getFaceDetectorOptions() {
+    return selectedFaceDetector === SSD_MOBILENETV1
+      ? new faceapi.SsdMobilenetv1Options({ minConfidence })
+      : (
+        selectedFaceDetector === TINY_FACE_DETECTOR
+          ? new faceapi.TinyFaceDetectorOptions({ inputSize, scoreThreshold })
+          : new faceapi.MtcnnOptions({ minFaceSize })
+      )
+  }
+  
+  function onIncreaseMinConfidence() {
+    minConfidence = Math.min(faceapi.round(minConfidence + 0.1), 1.0)
+    $('#minConfidence').val(minConfidence)
+    updateResults()
+  }
+  
+  function onDecreaseMinConfidence() {
+    minConfidence = Math.max(faceapi.round(minConfidence - 0.1), 0.1)
+    $('#minConfidence').val(minConfidence)
+    updateResults()
+  }
+  
+  function onInputSizeChanged(e) {
+    changeInputSize(e.target.value)
+    updateResults()
+  }
+  
+  function changeInputSize(size) {
+    inputSize = parseInt(size)
+  
+    const inputSizeSelect = $('#inputSize')
+    inputSizeSelect.val(inputSize)
+    inputSizeSelect.material_select()
+  }
+  
+  function onIncreaseScoreThreshold() {
+    scoreThreshold = Math.min(faceapi.round(scoreThreshold + 0.1), 1.0)
+    $('#scoreThreshold').val(scoreThreshold)
+    updateResults()
+  }
+  
+  function onDecreaseScoreThreshold() {
+    scoreThreshold = Math.max(faceapi.round(scoreThreshold - 0.1), 0.1)
+    $('#scoreThreshold').val(scoreThreshold)
+    updateResults()
+  }
+  
+  function onIncreaseMinFaceSize() {
+    minFaceSize = Math.min(faceapi.round(minFaceSize + 20), 300)
+    $('#minFaceSize').val(minFaceSize)
+  }
+  
+  function onDecreaseMinFaceSize() {
+    minFaceSize = Math.max(faceapi.round(minFaceSize - 20), 50)
+    $('#minFaceSize').val(minFaceSize)
+  }
+  
+  function getCurrentFaceDetectionNet() {
+    if (selectedFaceDetector === SSD_MOBILENETV1) {
+      return faceapi.nets.ssdMobilenetv1
+    }
+    if (selectedFaceDetector === TINY_FACE_DETECTOR) {
+      return faceapi.nets.tinyFaceDetector
+    }
+    if (selectedFaceDetector === MTCNN) {
+      return faceapi.nets.mtcnn
+    }
+  }
+  
+  function isFaceDetectionModelLoaded() {
+    return !!getCurrentFaceDetectionNet().params
+  }
+  
+  async function changeFaceDetector(detector) {
+    ['#ssd_mobilenetv1_controls', '#tiny_face_detector_controls', '#mtcnn_controls']
+      .forEach(id => $(id).hide())
+  
+    selectedFaceDetector = detector
+    const faceDetectorSelect = $('#selectFaceDetector')
+    faceDetectorSelect.val(detector)
+    faceDetectorSelect.material_select()
+  
+    $('#loader').show()
+    if (!isFaceDetectionModelLoaded()) {
+      await getCurrentFaceDetectionNet().load('/')
+    }
+  
+    $(`#${detector}_controls`).show()
+    $('#loader').hide()
+  }
+  
+  async function onSelectedFaceDetectorChanged(e) {
+    selectedFaceDetector = e.target.value
+  
+    await changeFaceDetector(e.target.value)
+    updateResults()
+  }
+  
+  function initFaceDetectionControls() {
+    const faceDetectorSelect = $('#selectFaceDetector')
+    faceDetectorSelect.val(selectedFaceDetector)
+    faceDetectorSelect.on('change', onSelectedFaceDetectorChanged)
+    faceDetectorSelect.material_select()
+  
+    const inputSizeSelect = $('#inputSize')
+    inputSizeSelect.val(inputSize)
+    inputSizeSelect.on('change', onInputSizeChanged)
+    inputSizeSelect.material_select()
+  }
+    </script>
+    <script>
+    async function onSelectedImageChanged(uri) {
+    const img = await faceapi.fetchImage(uri)
+    $(`#inputImg`).get(0).src = img.src
+    updateResults()
+  }
+  
+  async function loadImageFromUrl(url) {
+    const img = await requestExternalImage($('#imgUrlInput').val())
+    $('#inputImg').get(0).src = img.src
+    updateResults()
+  }
+  
+  function renderImageSelectList(selectListId, onChange, initialValue, withFaceExpressionImages) {
+    let images = [1, 2, 3, 4, 5].map(idx => `bbt${idx}.jpg`)
+  
+    if (withFaceExpressionImages) {
+      images = [
+        'happy.jpg',
+        'sad.jpg',
+        'angry.jpg',
+        'disgusted.jpg',
+        'surprised.jpg',
+        'fearful.jpg',
+        'neutral.jpg'
+      ].concat(images)
+    }
+  
+    function renderChildren(select) {
+      images.forEach(imageName =>
+        renderOption(
+          select,
+          imageName,
+          imageName
+        )
+      )
+    }
+  
+    renderSelectList(
+      selectListId,
+      onChange,
+      initialValue,
+      renderChildren
+    )
+  }
+  
+  function initImageSelectionControls(initialValue = 'bbt2.jpg', withFaceExpressionImages = false) {
+    renderImageSelectList(
+      '#selectList',
+      async (uri) => {
+        await onSelectedImageChanged(uri)
+      },
+      initialValue,
+      withFaceExpressionImages
+    )
+    onSelectedImageChanged($('#selectList select').val())
+  }
+    </script>
+    <script>
+    const classes = ['meghashyam','sheldon','gladson']
+  
+  function getFaceImageUri(className, idx) {
+    return `${className}/File ${idx}.jpg`
+  }
+  
+  function renderFaceImageSelectList(selectListId, onChange, initialValue) {
+    const indices = [1, 2, 3, 4, 5, 6, 7, 8, 9 , 10]
+    function renderChildren(select) {
+      classes.forEach(className => {
+        const optgroup = document.createElement('optgroup')
+        optgroup.label = className
+        select.appendChild(optgroup)
+        indices.forEach(imageIdx =>
+          renderOption(
+            optgroup,
+            `${className} ${imageIdx}`,
+            getFaceImageUri(className, imageIdx)
+          )
+        )
+      })
+    }
+  
+    renderSelectList(
+      selectListId,
+      onChange,
+      getFaceImageUri(initialValue.className, initialValue.imageIdx),
+      renderChildren
+    )
+  }
+  
+
+    </script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
+  <script>
+    // Initialize Firebase
+    var config = {
+      apiKey: "AIzaSyAISWZjL7FbC64iPTx78DZ_08wQQW-EAeI",
+      authDomain: "facerecognition-megh.firebaseapp.com",
+      databaseURL: "https://facerecognition-megh.firebaseio.com",
+      projectId: "facerecognition-megh",
+      storageBucket: "gs://facerecognition-megh.appspot.com",
+      messagingSenderId: "754202674833"
+    };
+    firebase.initializeApp(config);
+  </script>
+  </head>
+  <body>
+
+<input type="text" id="name" placeholder="Enter name" />
+<button onclick="start()">Start</button>
+<button onclick="stop()" id="stop" style="display:none">Stop</button>
+<video id="video" onplay="play()"></video>
+<div id="div"></div>
+<script>
+STOP=0;
+ const videoEl = document.getElementById('video')
+ const canvasEl = document.getElementById('canvas')
+  navigator.getUserMedia(
+    { video: {} },
+    stream => videoEl.srcObject = stream,
+    err => console.error(err)
+  )
+
+  videoEl.addEventListener('play',capture);
+
+  async function capture(e){
+    var canvas = document.createElement("canvas");
+        canvas.getContext('2d')
+            .drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        var img = document.createElement("img");
+        img.src = canvas.toDataURL();
+        const options = getFaceDetectorOptions()
+        await faceapi.nets.ssdMobilenetv1.load('/')
+        await faceapi.loadFaceRecognitionModel('/')
+        const detections = await faceapi.detectAllFaces(img, options)
+        const faceImages = await faceapi.extractFaces(img, detections)
+        console.log(faceImages);
+        if(faceImages[0]){
+          ctx=faceImages[0].getContext('2d');
+          var idataSrc = ctx.getImageData(0, 0, faceImages[0].width, faceImages[0].height), // original
+              idataTrg = ctx.createImageData(faceImages[0].width, faceImages[0].height),    // empty data
+              dataSrc = idataSrc.data,                              // reference the data itself
+              dataTrg = idataTrg.data,
+              len = dataSrc.length, i = 0, luma;
+          
+          // convert by iterating over each pixel each representing RGBA
+          for(; i < len; i += 4) {
+            // calculate luma, here using Rec 709
+            luma = dataSrc[i] * 0.2126 + dataSrc[i+1] * 0.7152 + dataSrc[i+2] * 0.0722;
+
+            // update target's RGB using the same luma value for all channels
+            dataTrg[i] = dataTrg[i+1] = dataTrg[i+2] = luma;
+            dataTrg[i+3] = dataSrc[i+3];                            // copy alpha
+          }
+          
+          // put back luma data so we can save it as image
+          ctx.putImageData(idataTrg, 0, 0);
+          let image = new Image();
+          image.src=faceImages[0].toDataURL();
+         
+          let face = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
+          
+          console.log("START",face);
+          const bestMatch = faceMatcher.findBestMatch(face.descriptor)
+          let div = document.createElement("div");
+          let span = document.createElement("span");
+          span.innerHTML=bestMatch.toString();
+          div.append(image);
+          div.append(span);
+          document.querySelector("#div").append(div);
+          console.log(bestMatch.toString())
+          
+          console.log(0);
+        }
+        if(STOP!=1)
+        setTimeout(capture,1000);
+  }
+  function start(){
+    //let name = document.querySelector("#name").value;
+    //var firestore = firebase.firestore();
+    //firestore.doc("users/"+name).set({name})
+    document.querySelector("#video").play();
+    //document.querySelector("#stop").style.display="initial"
+  }
+  function stop(){
+    document.querySelector("#video").pause();
+    STOP=1;
+  }
+  function play(){
+    console.log(1);
+    console.log(videoEl);
+  }
+
+  function next(){
+
+  }
+  async function init(){
+    await faceapi.nets.ssdMobilenetv1.load('/')
+    await faceapi.loadFaceRecognitionModel('/')
+    //await faceapi.loadTinyFaceDetectorModel('/')
+    //await faceapi.loadMtcnnModel('/')
+    await faceapi.loadFaceLandmarkModel('/')
+    await faceapi.loadFaceLandmarkTinyModel('/')
+    await faceapi.loadFaceRecognitionModel('/')
+    //await faceapi.loadFaceExpressionModel('/')
+    let firestore = firebase.firestore();
+    let loaded=0;
+    var storage = firebase.storage();
+
+    let users = await firestore.collection("users").get();
+    let images = await Promise.all(users.docs.map(async doc=>{
+      let facesCol = await firestore.collection("faces").where("name",'==',doc.data().name).get();
+      let facesID = await Promise.all(facesCol.docs.map(async doc=>{
+        let url = await storage.ref("/").child(`faces/${doc.data().name}/${doc.id}.jpg`).getDownloadURL();
+        let img = await faceapi.fetchImage(url);
+        let descriptor  = await faceapi.computeFaceDescriptor(img)
+        return descriptor;
+      }))
+      console.log(facesID);
+      return new faceapi.LabeledFaceDescriptors(
+        doc.data().name,
+        facesID
+      )
+    }));
+    console.log(images);
+    faceMatcher=new faceapi.FaceMatcher(images);
+    console.log(faceMatcher);
+    start();
+  }
+  init();
+</script>

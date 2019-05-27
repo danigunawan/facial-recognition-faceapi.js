@@ -1,0 +1,110 @@
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+
+<script src="face-api.js"></script>
+<script src="js/commons.js"></script>
+<script src="js/drawing.js"></script>
+<script src="js/faceDetectionControls.js"></script>
+<script src="js/imageSelectionControls.js"></script>
+<script src="js/bbt.js"></script>
+<script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
+<script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyAISWZjL7FbC64iPTx78DZ_08wQQW-EAeI",
+    authDomain: "facerecognition-megh.firebaseapp.com",
+    databaseURL: "https://facerecognition-megh.firebaseio.com",
+    projectId: "facerecognition-megh",
+    storageBucket: "gs://facerecognition-megh.appspot.com",
+    messagingSenderId: "754202674833"
+  };
+  firebase.initializeApp(config);
+</script>
+<input type="text" id="name" placeholder="Enter name" />
+<button onclick="start()">Start</button>
+<button onclick="stop()" id="stop" style="display:none">Stop</button>
+<video id="video" onplay="play()"></video>
+<div></div>
+<script>
+STOP=0;
+ const videoEl = document.getElementById('video')
+ const canvasEl = document.getElementById('canvas')
+  navigator.getUserMedia(
+    { video: {} },
+    stream => videoEl.srcObject = stream,
+    err => console.error(err)
+  )
+
+  videoEl.addEventListener('play',capture);
+
+  async function capture(e){
+    var canvas = document.createElement("canvas");
+        canvas.getContext('2d')
+            .drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        var img = document.createElement("img");
+        img.src = canvas.toDataURL();
+        const options = getFaceDetectorOptions()
+        await faceapi.nets.ssdMobilenetv1.load('/')
+        await faceapi.loadFaceRecognitionModel('/')
+        const detections = await faceapi.detectAllFaces(img, options)
+        const faceImages = await faceapi.extractFaces(img, detections)
+        faceMatcher = await createBbtFaceMatcher(1)
+        console.log(faceImages);
+        if(faceImages[0]){
+          ctx=faceImages[0].getContext('2d');
+          var idataSrc = ctx.getImageData(0, 0, faceImages[0].width, faceImages[0].height), // original
+              idataTrg = ctx.createImageData(faceImages[0].width, faceImages[0].height),    // empty data
+              dataSrc = idataSrc.data,                              // reference the data itself
+              dataTrg = idataTrg.data,
+              len = dataSrc.length, i = 0, luma;
+          
+          // convert by iterating over each pixel each representing RGBA
+          for(; i < len; i += 4) {
+            // calculate luma, here using Rec 709
+            luma = dataSrc[i] * 0.2126 + dataSrc[i+1] * 0.7152 + dataSrc[i+2] * 0.0722;
+
+            // update target's RGB using the same luma value for all channels
+            dataTrg[i] = dataTrg[i+1] = dataTrg[i+2] = luma;
+            dataTrg[i+3] = dataSrc[i+3];                            // copy alpha
+          }
+          
+          // put back luma data so we can save it as image
+          ctx.putImageData(idataTrg, 0, 0);
+         // demo.src = c.toDataURL();                                 // set demo result's src url
+          
+          // restore backup data
+          //ctx.putImageData(idataSrc, 0, 0);
+          let name = document.querySelector("#name").value;
+          var storageRef = firebase.storage().ref();
+          var firestore = firebase.firestore();
+          let res = await firestore.collection("faces").add({
+            name:name
+          })
+          faceImages[0].toBlob((blob)=>{
+            var mountainImagesRef = storageRef.child(`faces/${name}/${res.id}.jpg`);
+            mountainImagesRef.put(blob).then(function(snapshot) {
+              console.log('Uploaded a blob or file!');
+            });
+          },'image/png');
+
+          document.querySelector("div").append(faceImages[0]);
+        }
+        if(STOP!=1)
+        setTimeout(capture,1000);
+  }
+  function start(){
+    let name = document.querySelector("#name").value;
+    var firestore = firebase.firestore();
+    firestore.doc("users/"+name).set({name})
+    document.querySelector("#video").play();
+    document.querySelector("#stop").style.display="initial"
+  }
+  function stop(){
+    document.querySelector("#video").pause();
+    STOP=1;
+  }
+  function play(){
+    console.log(1);
+    console.log(videoEl);
+  }
+</script>
