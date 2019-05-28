@@ -1,112 +1,516 @@
-<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+<!DOCTYPE html>
+<html lang="en">
 
-<script src="face-api.js"></script>
-<script src="js/commons.js"></script>
-<script src="js/drawing.js"></script>
-<script src="js/faceDetectionControls.js"></script>
-<script src="js/imageSelectionControls.js"></script>
-<script src="js/bbt.js"></script>
-<script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
-<script>
-  // Initialize Firebase
-  var config = {
-    apiKey: "AIzaSyAISWZjL7FbC64iPTx78DZ_08wQQW-EAeI",
-    authDomain: "facerecognition-megh.firebaseapp.com",
-    databaseURL: "https://facerecognition-megh.firebaseio.com",
-    projectId: "facerecognition-megh",
-    storageBucket: "gs://facerecognition-megh.appspot.com",
-    messagingSenderId: "754202674833"
-  };
-  firebase.initializeApp(config);
-</script>
-<h1>Feed data</h1>
-<input type="text" id="name" placeholder="Enter name" />
-<button onclick="start()">Start</button>
-<button onclick="stop()" id="stop" style="display:none">Stop</button>
-<video id="video" onplay="play()"></video>
-<div></div>
-<a href="/test.html">Test</a>
-<script>
-STOP=0;
- const videoEl = document.getElementById('video')
- const canvasEl = document.getElementById('canvas')
-  navigator.getUserMedia(
-    { video: {} },
-    stream => videoEl.srcObject = stream,
-    err => console.error(err)
-  )
-
-  videoEl.addEventListener('play',capture);
-
-  async function capture(e){
-    var canvas = document.createElement("canvas");
-        canvas.getContext('2d')
-            .drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        var img = document.createElement("img");
-        img.src = canvas.toDataURL();
-        const options = getFaceDetectorOptions()
-        await faceapi.nets.ssdMobilenetv1.load('/')
-        await faceapi.loadFaceRecognitionModel('/')
-        const detections = await faceapi.detectAllFaces(img, options)
-        const faceImages = await faceapi.extractFaces(img, detections)
-        faceMatcher = await createBbtFaceMatcher(1)
-        console.log(faceImages);
-        if(faceImages[0]){
-          ctx=faceImages[0].getContext('2d');
-          var idataSrc = ctx.getImageData(0, 0, faceImages[0].width, faceImages[0].height), // original
-              idataTrg = ctx.createImageData(faceImages[0].width, faceImages[0].height),    // empty data
-              dataSrc = idataSrc.data,                              // reference the data itself
-              dataTrg = idataTrg.data,
-              len = dataSrc.length, i = 0, luma;
-          
-          // convert by iterating over each pixel each representing RGBA
-          for(; i < len; i += 4) {
-            // calculate luma, here using Rec 709
-            luma = dataSrc[i] * 0.2126 + dataSrc[i+1] * 0.7152 + dataSrc[i+2] * 0.0722;
-
-            // update target's RGB using the same luma value for all channels
-            dataTrg[i] = dataTrg[i+1] = dataTrg[i+2] = luma;
-            dataTrg[i+3] = dataSrc[i+3];                            // copy alpha
-          }
-          
-          // put back luma data so we can save it as image
-          ctx.putImageData(idataTrg, 0, 0);
-         // demo.src = c.toDataURL();                                 // set demo result's src url
-          
-          // restore backup data
-          //ctx.putImageData(idataSrc, 0, 0);
-          let name = document.querySelector("#name").value;
-          var storageRef = firebase.storage().ref();
-          var firestore = firebase.firestore();
-          let res = await firestore.collection("faces").add({
-            name:name
-          })
-          faceImages[0].toBlob((blob)=>{
-            var mountainImagesRef = storageRef.child(`faces/${name}/${res.id}.jpg`);
-            mountainImagesRef.put(blob).then(function(snapshot) {
-              console.log('Uploaded a blob or file!');
-            });
-          },'image/png');
-
-          document.querySelector("div").append(faceImages[0]);
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0px;
         }
-        if(STOP!=1)
-        setTimeout(capture,1000);
-  }
-  function start(){
-    let name = document.querySelector("#name").value;
-    var firestore = firebase.firestore();
-    firestore.doc("users/"+name).set({name})
-    document.querySelector("#video").play();
-    document.querySelector("#stop").style.display="initial"
-  }
-  function stop(){
-    document.querySelector("#video").pause();
-    STOP=1;
-  }
-  function play(){
-    console.log(1);
-    console.log(videoEl);
-  }
-</script>
+
+        #pages {
+            margin: 0px;
+            display: block;
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            transition: transform 0.3s;
+        }
+
+        #choicePage {
+            display: flex;
+        }
+
+        #pages>div {
+
+            min-width: 100%;
+            transition: transform 1s;
+            height: 100vh;
+            background: #ccc;
+            justify-content: center;
+            align-items: center;
+            color: #aaa;
+        }
+
+        #pages>div:not(#choicePage) {
+            flex-direction: column;
+            display: none;
+        }
+
+
+        button {
+            width: 100px;
+            height: 100px;
+            background: #ff6b6b;
+            display: flex;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            color: #e3e6e4;
+            margin: 30px;
+            border-radius: 50%;
+            padding: 20px;
+            font-size: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            outline: none;
+            box-sizing: content-box;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.1, 1.1);
+        }
+
+        #backButton {
+            position: fixed;
+            top: 0px;
+            left: 0px;
+            width: 100px;
+            height: 50px;
+            background: #ff6b6b;
+            display: flex;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            color: #e3e6e4;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.9;
+            transition: opacity 0.5s;
+        }
+
+        #backButton.hidden {
+            opacity: 0;
+        }
+
+        #backButton:hover:not(.hidden) {
+            opacity: 1;
+        }
+
+        #addNewFaceOnLoad {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-flow: column;
+        }
+
+        #onStop {
+
+            display: none;
+            flex-direction: column;
+        }
+
+        #rest,
+        #selected {
+            display: flex;
+            flex-wrap: wrap;
+            min-width: 500px;
+            min-height: 300px;
+        }
+
+        #onStop>div>div {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #onStop>div>div input {
+            font-size: 16px;
+            padding: 3px;
+        }
+
+        #onStop>div>div button {
+            width: auto;
+            height: auto;
+            display: inline-block;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        #rest img,
+        #selected img {
+            width: 100px;
+            height: 100px;
+            margin: 20px;
+            transition: transform 0.5s;
+        }
+
+        #onStop hr {
+            width: 100px;
+            border: 3px solid #999;
+        }
+
+        #addNewFaceOnLoad {
+            visibility: hidden
+        }
+    </style>
+</head>
+
+<body>
+    <div id="pages">
+        <div id="choicePage">
+            <button id="addNewFace">
+                Add your face
+            </button>
+            <button id="recognize">
+                Checkout Facial Recognition
+            </button>
+        </div>
+        <div id="addNewFacePage">
+            <h1>Adding New Face</h1>
+            <div></div>
+            <button class="loadingStatus">
+                Loading...
+            </button>
+            <div id="addNewFaceOnLoad">
+                <video></video>
+                <img src="" />
+                <div><span id="face-count">0</span> face images captured.</div>
+                <button id="stop">Stop</button>
+            </div>
+            <div id="onStop">
+                <div id="selected">
+                    <div>
+                        <h1>Selected</h1>
+                        <p>Drag up or double click the images you want to select.</p>
+                        <input name="" placeholder="Name" list="suggestions" />
+                        <datalist id="suggestions">
+                            <option>Me</option>
+                        </datalist>
+                        <button id="uploadImages">Save</button>
+                    </div>
+                </div>
+                <hr />
+                <div id="rest">
+                    <div>
+                        <h1>Rest</h1>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+       
+        <div id="recognizePage">
+            <h1>Facial Recognition</h1>
+            <button class="loadingStatus">
+                Loading...
+            </button>
+            <div id="recognizePageOnLoad">
+                <video></video>
+                <img src="" />
+            </div>
+
+
+        </div>
+    </div>
+    <div id="backButton" class="hidden">
+        Back
+    </div>
+    <div
+        style="position:fixed;bottom:0px;left:0px;right:0px;width:100%;display:block;text-align: center;background: #000;color:#fff;padding:10px;opacity: 0.5;">
+        Please refresh if something doesn't work as expected
+    </div>
+    <script src="js/face-api.js"></script>
+    <script src="js/faceDetectionControls.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
+    <script>
+        //Initialize Firebase
+        const config = {
+            apiKey: "AIzaSyAISWZjL7FbC64iPTx78DZ_08wQQW-EAeI",
+            authDomain: "facerecognition-megh.firebaseapp.com",
+            databaseURL: "https://facerecognition-megh.firebaseio.com",
+            projectId: "facerecognition-megh",
+            storageBucket: "gs://facerecognition-megh.appspot.com",
+            messagingSenderId: "754202674833"
+        };
+        firebase.initializeApp(config);
+        const $ = (selector) => document.querySelector(selector);
+        const $all = (selector) => document.querySelectorAll(selector);
+        const constructors = {
+            'addNewFace': initAddNewFacePage,
+            'recognize': initFacialRecognition
+        };
+        const faceImages = [];
+        const flags = {
+            detectFaces: false
+        };
+        navigator.getUserMedia = ( navigator.getUserMedia ||
+                       navigator.webkitGetUserMedia ||
+                       navigator.mozGetUserMedia ||
+                       navigator.msGetUserMedia);
+        $all("#choicePage button").forEach(button => button.addEventListener("click", event => {
+            const buttonId = event.target.id;
+            $("#" + buttonId + "Page").style.display = "flex";
+            $("#pages").style.transform = "translate(0px,-100vh)";
+            $("#backButton").className = "";
+            constructors[buttonId].call();
+        }));
+        $("#backButton").addEventListener('click', () => {
+            $("#pages").style.transform = "translate(0px,0px)";
+            $("#backButton").className = "hidden";
+            setTimeout(() => {
+                $all("#pages>div:not(#choicePage)").forEach(page => page.style.display = "None");
+            }, 300);
+            $all("#pages>div>div").forEach(elem => {
+                elem.removeAttribute('style');
+            });
+        });
+
+
+        async function initAddNewFacePage() {
+            $("#addNewFacePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models...";
+            await faceapi.nets.ssdMobilenetv1.load('/models');
+            $("#addNewFacePage .loadingStatus").innerText = "Loading face recognition models...";
+            await faceapi.loadFaceRecognitionModel('/models');
+            $("#addNewFacePage .loadingStatus").innerText = "Loading video...";
+
+            navigator.getUserMedia(
+                { video: {} },
+                stream => {
+                    $("#addNewFacePage video").srcObject = stream;
+                    $("#addNewFacePage video").play();
+                    flags.detectFaces = true;
+                    $("#addNewFacePage video").addEventListener('play', detectFaces);
+                    $("#stop").addEventListener('click', () => {
+                        $("#addNewFacePage video").pause();
+                        stream.getTracks()[0].stop();
+                        flags.detectFaces = false;
+                        viewFaces();
+                    });
+                },
+                err => console.error(err)
+            );
+        }
+
+        async function detectFaces() {
+            const video = $("#addNewFacePage video");
+            const img = $("#addNewFaceOnLoad img");
+            video.style.transform = "scale(0,0)"
+            video.style.position = "fixed"
+            const canvas = document.createElement("canvas");
+            canvas.width = video.clientWidth;
+            canvas.height = video.clientHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, video.clientWidth, video.clientHeight);
+            const options = getFaceDetectorOptions();
+            $("#addNewFaceOnLoad").style.visibility = "visible";
+            if (img.width == 0)
+                img.src = canvas.toDataURL();
+            $("#addNewFacePage .loadingStatus").style.display = "none";
+
+            const detections = await faceapi.detectAllFaces(img, options);
+            collectFaces(img, detections);
+            detections.forEach(faces => {
+                let { x, y, width, height } = faces.box;
+                ctx.rect(x, y, width, height);
+                ctx.stroke();
+            })
+            img.src = canvas.toDataURL();
+            if (flags.detectFaces)
+                requestAnimationFrame(detectFaces);
+        }
+        async function collectFaces(img, detections) {
+            const faces = await faceapi.extractFaces(img, detections);
+            faces.forEach(face => {
+                convertToGrayscale(face);
+                faceImages.push(face);
+                $("#face-count").innerText = faceImages.length;
+            });
+        }
+        function convertToGrayscale(face) {
+            const ctx = face.getContext('2d');
+            let colored = ctx.getImageData(0, 0, face.width, face.height);
+            let grayscaled = ctx.createImageData(face.width, face.height);
+            let length = colored.data.length;
+
+            // convert by iterating over each pixel each representing RGBA
+            for (let i = 0; i < length; i += 4) {
+                // calculate luma, here using Rec 709
+                let luma = colored.data[i] * 0.2126 + colored.data[i + 1] * 0.7152 + colored.data[i + 2] * 0.0722;
+                // update target's RGB using the same luma value for all channels
+                grayscaled.data[i] = grayscaled.data[i + 1] = grayscaled.data[i + 2] = luma;
+                grayscaled.data[i + 3] = colored.data[i + 3];                            // copy alpha
+            }
+            // put back luma data so we can save it as image
+            ctx.putImageData(grayscaled, 0, 0);
+
+        }
+        async function viewFaces() {
+            $("#addNewFaceOnLoad").style.display = "none";
+            $("#addNewFacePage #onStop").style.display = "flex";
+            faceImages.forEach(face => {
+                const img = document.createElement("img");
+                img.src = face.toDataURL();
+                img.draggable = true;
+                $("#rest").append(img);
+
+                img.addEventListener('dragstart', (ev) => {
+                    ev.dataTransfer.setData("text", JSON.stringify([ev.target.parentElement.id, Array.from(ev.target.parentElement.children).indexOf(ev.target)]));
+                })
+                img.addEventListener('dblclick', event => {
+                    const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
+                    newParent.appendChild(event.target);
+                });
+            });
+            const collection = await firebase.firestore().collection("users").get();
+            const datalist = $("datalist");
+            collection.docs.forEach(doc => {
+                const option = document.createElement("option");
+                option.innerText = doc.id;
+                datalist.append(option);
+            })
+
+        }
+
+        document.addEventListener('dragover', (ev) => {
+            ev.preventDefault();
+        })
+        $("#selected").addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const [id, index] = JSON.parse(ev.dataTransfer.getData("text"));
+            const parent = $("#" + id);
+            const elem = parent.children[index];
+            $("#selected").appendChild(elem);
+        })
+        $("#rest").addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const [id, index] = JSON.parse(ev.dataTransfer.getData("text"));
+            const parent = $("#" + id);
+            const elem = parent.children[index];
+            $("#rest").appendChild(elem);
+        })
+
+        $("#uploadImages").addEventListener('click', async (event) => {
+
+            const name = $("#selected input").value;
+            const images = $all("#selected img");
+            let left = images.length;
+            const firestore = firebase.firestore();
+            if (name.length == 0)
+                return alert("Please enter name");
+            const result = await firestore.doc("users/" + name).get();
+            if (images.length == 0)
+                alert("Please select images");
+            event.target.innerText = "Saving...";
+            if (!result.exists)
+                await firestore.doc("users/" + name).set({
+                    name,
+                    createdAt: Date()
+                });
+            images.forEach(async (img, index) => {
+                const doc = await firestore.collection("faces").add({
+                    name: name,
+                    createdAt: Date(),
+                    userAgent: navigator.userAgent,
+                    width: img.width,
+                    height: img.height
+                });
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.toBlob(async (blob) => {
+                    const ref = firebase.storage().ref().child(`faces/${name}/${doc.id}.jpg`);
+                    await ref.put(blob);
+                    img.style.transform = "scale(0,0) rotate(360deg)";
+                    left--;
+                    setTimeout(() => {
+                        img.remove();
+                    }, 500);
+                    if (left == 0) {
+                        event.target.innerText = "Save";
+                        $("#selected input").value = "";
+                    }
+
+                }, 'image/jpeg');
+            });
+
+        });
+
+        async function initFacialRecognition() {
+            $("#recognizePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models...";
+            await faceapi.nets.ssdMobilenetv1.load('/models')
+            $("#recognizePage .loadingStatus").innerText = "Loading FaceRecognition models...";
+            await faceapi.loadFaceRecognitionModel('/models')
+            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmark models...";
+            await faceapi.loadFaceLandmarkModel('/models')
+            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmarkTiny models...";
+            await faceapi.loadFaceLandmarkTinyModel('/models')
+            $("#recognizePage .loadingStatus").innerText = "Loading users...";
+            const firestore = firebase.firestore();
+            const storage = firebase.storage();
+            const users = await firestore.collection("users").get();
+            let done = 0;
+            const userLabels = await Promise.all(users.docs.map(async doc => {
+                try {
+                    $("#recognizePage .loadingStatus").innerText = "Loading faces for " + (done++) + "/"+users.docs.length+"...";
+                    let faces = await firestore.collection("faces").where("name", '==', doc.id).get();
+                    const descriptors = await Promise.all(faces.docs.map(async doc => {
+                        try {
+                            let url = await storage.ref("/").child(`faces/${doc.data().name}/${doc.id}.jpg`).getDownloadURL();
+                            let img = await faceapi.fetchImage(url);
+                            return await faceapi.computeFaceDescriptor(img);
+                        }
+                        catch (err) { console.log(err) }
+                    }));
+                    return new faceapi.LabeledFaceDescriptors(doc.id, descriptors);
+                }
+                catch (err) { console.log(err) }
+            }));
+            const faceMatcher = new faceapi.FaceMatcher(userLabels);
+            $("#recognizePage .loadingStatus").innerText = "Loading video...";
+            navigator.getUserMedia(
+                { video: {} },
+                stream => {
+                    $("#recognizePage video").srcObject = stream;
+                    flags.detectFaces=true;
+                    $("#recognizePage video").play();
+
+                    $("#recognizePage video").addEventListener('play', runFacialRecognition);
+                },
+                err => console.error(err)
+            );
+            async function runFacialRecognition() {
+                const video = $("#recognizePage video");
+                const img = $("#recognizePage img");
+                video.style.transform = "scale(0,0)"
+                video.style.position = "fixed"
+                const canvas = document.createElement("canvas");
+                canvas.width = video.clientWidth;
+                canvas.height = video.clientHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, video.clientWidth, video.clientHeight);
+                const options = getFaceDetectorOptions();
+                $("#recognizePageOnLoad").style.visibility = "visible";
+                if (img.width == 0)
+                    img.src = canvas.toDataURL();
+                $("#recognizePage .loadingStatus").style.display = "none";
+
+                const faceData = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
+                if(faceData){
+                    const bestMatch = faceMatcher.findBestMatch(faceData.descriptor);
+                    const { x, y, width, height } = faceData.detection.box;
+                    ctx.rect(x, y, width, height);
+                    ctx.strokeStyle="#fff"
+                    ctx.stroke();
+                    ctx.font = "16px Arial";
+                    ctx.fillStyle="#fff";                    
+                    ctx.fillText(bestMatch.label, x+(width/2), y);
+                }
+                img.src = canvas.toDataURL();
+                if (flags.detectFaces)
+                    requestAnimationFrame(runFacialRecognition);
+            }
+        }
+    </script>
+</body>
+
+</html>

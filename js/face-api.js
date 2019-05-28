@@ -5609,7 +5609,6 @@
             configurable: true
         });
         FaceMatcher.prototype.computeMeanDistance = function (queryDescriptor, descriptors) {
-            console.log('computeMeanDistance',queryDescriptor, descriptors);
             return descriptors
                 .map(function (d) { return euclideanDistance(d, queryDescriptor); })
                 .reduce(function (d1, d2) { return d1 + d2; }, 0)
@@ -5620,13 +5619,11 @@
             return this.labeledDescriptors
                 .map(function (_a) {
                 var descriptors = _a.descriptors, label = _a.label;
-                console.log('matchDescriptor',queryDescriptor, descriptors);
                 return new FaceMatch(label, _this.computeMeanDistance(queryDescriptor, descriptors));
             })
                 .reduce(function (best, curr) { return best.distance < curr.distance ? best : curr; });
         };
         FaceMatcher.prototype.findBestMatch = function (queryDescriptor) {
-            console.log('findBestMatch',queryDescriptor);
             var bestMatch = this.matchDescriptor(queryDescriptor);
             return bestMatch.distance < this.distanceThreshold
                 ? bestMatch
