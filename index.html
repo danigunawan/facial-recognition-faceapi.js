@@ -16,7 +16,7 @@
             display: block;
             position: relative;
             width: 100vw;
-            height: 100vh;
+            min-height: 100vh;
             transition: transform 0.3s;
         }
 
@@ -28,7 +28,7 @@
 
             min-width: 100%;
             transition: transform 1s;
-            height: 100vh;
+            min-height: 100vh;
             background: #ccc;
             justify-content: center;
             align-items: center;
@@ -110,7 +110,6 @@
         #selected {
             display: flex;
             flex-wrap: wrap;
-            min-width: 500px;
             min-height: 300px;
         }
 
@@ -149,6 +148,30 @@
         #addNewFaceOnLoad {
             visibility: hidden
         }
+        .loadingStatus{
+            width: 70vw;
+            
+            background: #ff6b6b;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            color: #e3e6e4;
+            margin: 30px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            outline: none;
+            box-sizing: content-box;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.3s;
+        }
+        #feedbackPage input,#feedbackPage textarea{
+            font-size:16px;
+            padding:3px;
+            width:90vw;
+            margin:20px;
+        }
+        
     </style>
 </head>
 
@@ -161,13 +184,16 @@
             <button id="recognize">
                 Checkout Facial Recognition
             </button>
+            <button id="feedback">
+                    Feedbacks. Because, why not?
+                </button>
         </div>
         <div id="addNewFacePage">
             <h1>Adding New Face</h1>
             <div></div>
-            <button class="loadingStatus">
+            <div class="loadingStatus">
                 Loading...
-            </button>
+            </div>
             <div id="addNewFaceOnLoad">
                 <video></video>
                 <img src="" />
@@ -198,9 +224,9 @@
        
         <div id="recognizePage">
             <h1>Facial Recognition</h1>
-            <button class="loadingStatus">
+            <div class="loadingStatus">
                 Loading...
-            </button>
+            </div>
             <div id="recognizePageOnLoad">
                 <video></video>
                 <img src="" />
@@ -208,6 +234,14 @@
 
 
         </div>
+        <div id="feedbackPage">
+                <h1>Feedbacks</h1>
+                
+                <input placeholder="From whom am i hearing?">
+                <textarea placeholder="And what message do you carry?"></textarea>
+                <button>Send</button>
+    
+            </div>
     </div>
     <div id="backButton" class="hidden">
         Back
@@ -219,22 +253,15 @@
     <script src="js/face-api.js"></script>
     <script src="js/faceDetectionControls.js"></script>
     <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
+    <script src="js/firebase-config.js"></script>
     <script>
-        //Initialize Firebase
-        const config = {
-            apiKey: "AIzaSyAISWZjL7FbC64iPTx78DZ_08wQQW-EAeI",
-            authDomain: "facerecognition-megh.firebaseapp.com",
-            databaseURL: "https://facerecognition-megh.firebaseio.com",
-            projectId: "facerecognition-megh",
-            storageBucket: "gs://facerecognition-megh.appspot.com",
-            messagingSenderId: "754202674833"
-        };
-        firebase.initializeApp(config);
+
         const $ = (selector) => document.querySelector(selector);
         const $all = (selector) => document.querySelectorAll(selector);
         const constructors = {
             'addNewFace': initAddNewFacePage,
-            'recognize': initFacialRecognition
+            'recognize': initFacialRecognition,
+            'feedback':initFeedback
         };
         const faceImages = [];
         const flags = {
@@ -264,12 +291,12 @@
 
 
         async function initAddNewFacePage() {
-            $("#addNewFacePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models...";
+            $("#addNewFacePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models... might take longer to load the first time, please bare with me :)";
             await faceapi.nets.ssdMobilenetv1.load('/models');
-            $("#addNewFacePage .loadingStatus").innerText = "Loading face recognition models...";
+            $("#addNewFacePage .loadingStatus").innerText = "Loading face recognition models... might take longer to load the first time, please bare with me :)";
             await faceapi.loadFaceRecognitionModel('/models');
-            $("#addNewFacePage .loadingStatus").innerText = "Loading video...";
-
+            $("#addNewFacePage .loadingStatus").innerText = "Loading video... make sure you have given access to camera";
+            console.log(navigator,navigator.getUserMedia);
             navigator.getUserMedia(
                 { video: {} },
                 stream => {
@@ -357,6 +384,11 @@
                     const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
                     newParent.appendChild(event.target);
                 });
+                
+                img.addEventListener('touchstart', event => {
+                    const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
+                    newParent.appendChild(event.target);
+                });
             });
             const collection = await firebase.firestore().collection("users").get();
             const datalist = $("datalist");
@@ -436,15 +468,15 @@
         });
 
         async function initFacialRecognition() {
-            $("#recognizePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models...";
+            $("#recognizePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models... might take longer to load the first time, please bare with me :)";
             await faceapi.nets.ssdMobilenetv1.load('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading FaceRecognition models...";
+            $("#recognizePage .loadingStatus").innerText = "Loading FaceRecognition models... might take longer to load the first time, please bare with me :)";
             await faceapi.loadFaceRecognitionModel('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmark models...";
+            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmark models... might take longer to load the first time, please bare with me :)";
             await faceapi.loadFaceLandmarkModel('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmarkTiny models...";
+            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmarkTiny models... might take longer to load the first time, please bare with me :)";
             await faceapi.loadFaceLandmarkTinyModel('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading users...";
+            $("#recognizePage .loadingStatus").innerText = "Loading users... ";
             const firestore = firebase.firestore();
             const storage = firebase.storage();
             const users = await firestore.collection("users").get();
@@ -466,7 +498,7 @@
                 catch (err) { console.log(err) }
             }));
             const faceMatcher = new faceapi.FaceMatcher(userLabels);
-            $("#recognizePage .loadingStatus").innerText = "Loading video...";
+            $("#recognizePage .loadingStatus").innerText = "Loading video... make sure you have given access to camera ";
             navigator.getUserMedia(
                 { video: {} },
                 stream => {
@@ -510,6 +542,23 @@
                     requestAnimationFrame(runFacialRecognition);
             }
         }
+        function initFeedback(){}
+        $("#feedbackPage button").addEventListener('click',async ()=>{
+            $("#feedbackPage button").innerText="Sending the raven...";
+            let name = $("#feedbackPage input").value;
+            let message = $("#feedbackPage textarea").value;
+            await firebase.firestore().collection("feedbacks").add({
+                name,
+                message,
+                time:Date(),
+                userAgent:navigator.userAgent
+            })
+            $("#feedbackPage input").value="";
+            $("#feedbackPage textarea").value="";
+            $("#feedbackPage button").innerText="Thank you for your feedback";
+
+            
+        });
     </script>
 </body>
 
