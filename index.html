@@ -455,8 +455,9 @@
                 const ctx = canvas.getContext("2d");
                 canvas.width = img.width;
                 canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.width);
                 canvas.toBlob(async (blob) => {
-                    const ref = firebase.storage().ref().child(`faces/${name}/${doc.id}.jpg`);
+                    const ref = firebase.storage().ref().child(`faces/${name}/${doc.id}.png`);
                     await ref.put(blob);
                     img.style.transform = "scale(0,0) rotate(360deg)";
                     left--;
@@ -468,7 +469,7 @@
                         $("#selected input").value = "";
                     }
 
-                }, 'image/jpeg');
+                }, 'image/png');
             });
 
         });
@@ -493,7 +494,7 @@
                     let faces = await firestore.collection("faces").where("name", '==', doc.id).get();
                     const descriptors = await Promise.all(faces.docs.map(async doc => {
                         try {
-                            let url = await storage.ref("/").child(`faces/${doc.data().name}/${doc.id}.jpg`).getDownloadURL();
+                            let url = await storage.ref("/").child(`faces/${doc.data().name}/${doc.id}.png`).getDownloadURL();
                             let img = await faceapi.fetchImage(url);
                             return await faceapi.computeFaceDescriptor(img);
                         }
