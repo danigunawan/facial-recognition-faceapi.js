@@ -24,8 +24,9 @@
         #choicePage {
             display: flex;
         }
-        @media screen and (max-width:700px){
-            #choicePage{
+
+        @media screen and (max-width:700px) {
+            #choicePage {
                 flex-direction: column;
             }
         }
@@ -35,7 +36,7 @@
             min-width: 100%;
             transition: transform 1s;
             min-height: 100vh;
-            
+
             justify-content: center;
             align-items: center;
             color: #aaa;
@@ -154,9 +155,10 @@
         #addNewFaceOnLoad {
             visibility: hidden
         }
-        .loadingStatus{
+
+        .loadingStatus {
             width: 70vw;
-            
+
             background: #ff6b6b;
             text-align: center;
             justify-content: center;
@@ -171,19 +173,48 @@
             border: none;
             transition: transform 0.3s;
         }
-        #feedbackPage input,#feedbackPage textarea{
-            font-size:16px;
-            padding:3px;
-            width:90vw;
-            margin:20px;
+
+        #feedbackPage input,
+        #feedbackPage textarea {
+            font-size: 16px;
+            padding: 3px;
+            width: 90vw;
+            margin: 20px;
         }
-        
+
+        #output {
+            position: relative;
+            display: flex;
+
+        }
+
+        #output canvas {
+            position: absolute;
+            top: 0px;
+        }
+
+        #loader {
+            position: absolute;
+            left: 0px;
+            right: 0px;
+            bottom: 0px;
+            top: 0px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+        }
     </style>
 </head>
 
 <body>
     <div id="pages">
+
         <div id="choicePage">
+
             <button id="addNewFace">
                 Add your face
             </button>
@@ -191,8 +222,8 @@
                 Checkout Facial Recognition
             </button>
             <button id="feedback">
-                    Feedbacks. Because, why not?
-                </button>
+                Feedbacks. Because, why not?
+            </button>
         </div>
         <div id="addNewFacePage">
             <h1>Adding New Face</h1>
@@ -201,8 +232,11 @@
                 Loading...
             </div>
             <div id="addNewFaceOnLoad">
-                <video></video>
-                <img src="" />
+                Scroll down, click on stop to stop recording faces.
+                <div id="output">
+                    <video></video>
+                    <canvas></canvas>
+                </div>
                 <div><span id="face-count">0</span> face images captured.</div>
                 <button id="stop">Stop</button>
             </div>
@@ -213,7 +247,7 @@
                         <p>Drag up or double click the images you want to select.</p>
                         <input name="" placeholder="Name" list="suggestions" />
                         <datalist id="suggestions">
-                            
+
                         </datalist>
                         <button id="uploadImages">Save</button>
                     </div>
@@ -227,27 +261,30 @@
                 </div>
             </div>
         </div>
-       
+
         <div id="recognizePage">
             <h1>Facial Recognition</h1>
             <div class="loadingStatus">
                 Loading...
             </div>
             <div id="recognizePageOnLoad">
-                <video></video>
-                <img src="" />
+                <div id="output">
+                    <video></video>
+                    <canvas></canvas>
+                </div>
             </div>
 
 
         </div>
         <div id="feedbackPage">
-                <h1>Feedbacks</h1>
-                
-                <input placeholder="From whom am i hearing?">
-                <textarea placeholder="And what message do you carry?"></textarea>
-                <button>Send</button>
-    
-            </div>
+            <h1>Feedbacks</h1>
+
+            <input placeholder="From whom am i hearing?">
+            <textarea placeholder="And what message do you carry?"></textarea>
+            <button>Send</button>
+
+        </div>
+
     </div>
     <div id="backButton" class="hidden">
         Back
@@ -256,316 +293,536 @@
         style="position:fixed;bottom:0px;left:0px;right:0px;width:100%;display:block;text-align: center;background: #000;color:#fff;padding:10px;opacity: 0.5;">
         Please refresh if something doesn't work as expected
     </div>
+    <div id="loader">
+        Please wait...
+    </div>
     <script src="js/face-api.js"></script>
     <script src="js/faceDetectionControls.js"></script>
     <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
     <script src="js/firebase-config.js"></script>
     <script>
 
+        window.onerror = function (message, source, lineno, colno, error) {
+            reportError({ message, source, lineno, colno });
+
+        };
         const $ = (selector) => document.querySelector(selector);
         const $all = (selector) => document.querySelectorAll(selector);
         const constructors = {
             'addNewFace': initAddNewFacePage,
             'recognize': initFacialRecognition,
-            'feedback':initFeedback
+            'feedback': initFeedback
         };
         const faceImages = [];
         const flags = {
             detectFaces: false
         };
-        navigator.getUserMedia = ( navigator.getUserMedia ||
-                       navigator.webkitGetUserMedia ||
-                       navigator.mozGetUserMedia ||
-                       navigator.msGetUserMedia);
+        const files = [
+            ['models/ssd_mobilenetv1_model-weights_manifest.json', 26548],
+            ['models/ssd_mobilenetv1_model-shard1', 4194304],
+            ['models/ssd_mobilenetv1_model-shard2', 1422653],
+            ['models/face_recognition_model-weights_manifest.json', 18303],
+            ['models/face_recognition_model-shard1', 4194304],
+            ['models/face_recognition_model-shard2', 2249728],
+            ['models/face_landmark_68_model-weights_manifest.json', 7889],
+            ['models/face_landmark_68_model-shard1', 356840],
+        ];
+        const options = {
+            audio: false,
+            video: {
+                facingMode: 'user'
+            }
+        };
+        async function download([file, size], loader, model) {
+            try {
+
+                const response = await fetch(file);
+                const reader = response.body.getReader();
+                const contentLength = size;
+                let receivedLength = 0;
+                let chunks = [];
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) {
+                        break;
+                    }
+
+                    chunks.push(value);
+                    receivedLength += value.length;
+                    const percent = (receivedLength * 100 / contentLength).toFixed(0);
+                    const x = String(file).split(/[\-_]/)
+                    const filetype = x[x.length - 1];
+                    loader.innerText = `Loading ${model} ${filetype} ${percent}%... might take longer to load the first time, please bare with me :)`;
+                }
+                let chunksAll = new Uint8Array(receivedLength); // (4.1)
+                let position = 0;
+                for (let chunk of chunks) {
+                    chunksAll.set(chunk, position); // (4.2)
+                    position += chunk.length;
+                }
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+
+        }
+        async function preload(model, loader) {
+            try {
+                let model_files = files.filter(item => item[0].match(model));
+                for (let i = 0; i < model_files.length; i++)
+                    await download(model_files[i], loader, model);
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+        }
+
+        navigator.getUserMedia = (navigator.getUserMedia ||
+            navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia ||
+            navigator.msGetUserMedia);
+
         $all("#choicePage button").forEach(button => button.addEventListener("click", event => {
-            const buttonId = event.target.id;
-            $("#" + buttonId + "Page").style.display = "flex";
-            $("#pages").style.transform = "translate(0px,-100vh)";
-            $("#backButton").className = "";
-            constructors[buttonId].call();
+            try {
+                const buttonId = event.target.id;
+                $("#" + buttonId + "Page").style.display = "flex";
+                $("#pages").style.transform = "translate(0px,-100vh)";
+                $("#backButton").className = "";
+                constructors[buttonId].call();
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
         }));
+
         $("#backButton").addEventListener('click', () => {
-            $("#pages").style.transform = "translate(0px,0px)";
-            $("#backButton").className = "hidden";
-            setTimeout(() => {
-                $all("#pages>div:not(#choicePage)").forEach(page => page.style.display = "None");
-            }, 300);
-            $all("#pages>div>div").forEach(elem => {
-                elem.removeAttribute('style');
-            });
+            try {
+                $("#pages").style.transform = "translate(0px,0px)";
+                $("#backButton").className = "hidden";
+                setTimeout(() => {
+                    $all("#pages>div:not(#choicePage)").forEach(page => page.style.display = "None");
+                }, 300);
+                $all("#pages>div>div").forEach(elem => {
+                    elem.removeAttribute('style');
+                });
+                flags.detectFaces=false;
+                
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
         });
 
 
         async function initAddNewFacePage() {
-            $("#addNewFacePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models... might take longer to load the first time, please bare with me :)";
-            await faceapi.nets.ssdMobilenetv1.load('/models');
-            $("#addNewFacePage .loadingStatus").innerText = "Loading face recognition models... might take longer to load the first time, please bare with me :)";
-            await faceapi.loadFaceRecognitionModel('/models');
-            $("#addNewFacePage .loadingStatus").innerText = "Loading video... make sure you have given access to camera";
-            console.log(navigator,navigator.getUserMedia);
-            navigator.getUserMedia(
-                { video: {} },
-                stream => {
-                    $("#addNewFacePage video").srcObject = stream;
-                    $("#addNewFacePage video").play();
-                    flags.detectFaces = true;
-                    $("#addNewFacePage video").addEventListener('play', detectFaces);
-                    $("#stop").addEventListener('click', () => {
+            try {
+                
+                $("#addNewFacePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models... might take longer to load the first time, please bare with me :)";
+                await preload('ssd_mobilenetv1', $("#addNewFacePage .loadingStatus"));
+                await faceapi.nets.ssdMobilenetv1.load('/models');
+                $("#addNewFacePage .loadingStatus").innerText = "Loading video... might take few seconds, make sure you have given access to camera";
+                const stream = await navigator.mediaDevices.getUserMedia(options);
+                $("#addNewFacePage video").srcObject = stream;
+                $("#addNewFacePage video").play();
+                flags.detectFaces = true;
+                $("#addNewFacePage video").addEventListener('play', detectFaces);
+                $("#stop").addEventListener('click', () => {
+                    try {
                         $("#addNewFacePage video").pause();
                         stream.getTracks()[0].stop();
                         flags.detectFaces = false;
                         viewFaces();
-                    });
-                },
-                err => console.error(err)
-            );
+                    }
+                    catch (err) {
+                    
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                });
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+
         }
 
         async function detectFaces() {
-            const video = $("#addNewFacePage video");
-            const img = $("#addNewFaceOnLoad img");
-            video.style.transform = "scale(0,0)"
-            video.style.position = "fixed"
-            const canvas = document.createElement("canvas");
-            canvas.width = video.clientWidth;
-            canvas.height = video.clientHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, video.clientWidth, video.clientHeight);
-            const options = getFaceDetectorOptions();
-            $("#addNewFaceOnLoad").style.visibility = "visible";
-            if (img.width == 0)
-                img.src = canvas.toDataURL();
-            $("#addNewFacePage .loadingStatus").style.display = "none";
+            try {
+                const video = $("#addNewFacePage video");
 
-            const detections = await faceapi.detectAllFaces(img, options);
-            collectFaces(img, detections);
-            detections.forEach(faces => {
-                let { x, y, width, height } = faces.box;
-                ctx.rect(x, y, width, height);
-                ctx.stroke();
-            })
-            img.src = canvas.toDataURL();
-            if (flags.detectFaces)
-                requestAnimationFrame(detectFaces);
-        }
-        async function collectFaces(img, detections) {
-            const faces = await faceapi.extractFaces(img, detections);
-            faces.forEach(face => {
-                convertToGrayscale(face);
-                faceImages.push(face);
-                $("#face-count").innerText = faceImages.length;
-            });
-        }
-        function convertToGrayscale(face) {
-            const ctx = face.getContext('2d');
-            let colored = ctx.getImageData(0, 0, face.width, face.height);
-            let grayscaled = ctx.createImageData(face.width, face.height);
-            let length = colored.data.length;
+                const img = new Image(video.clientWidth, video.clientHeight);
 
-            // convert by iterating over each pixel each representing RGBA
-            for (let i = 0; i < length; i += 4) {
-                // calculate luma, here using Rec 709
-                let luma = colored.data[i] * 0.2126 + colored.data[i + 1] * 0.7152 + colored.data[i + 2] * 0.0722;
-                // update target's RGB using the same luma value for all channels
-                grayscaled.data[i] = grayscaled.data[i + 1] = grayscaled.data[i + 2] = luma;
-                grayscaled.data[i + 3] = colored.data[i + 3];                            // copy alpha
-            }
-            // put back luma data so we can save it as image
-            ctx.putImageData(grayscaled, 0, 0);
-
-        }
-        async function viewFaces() {
-            $("#addNewFaceOnLoad").style.display = "none";
-            $("#addNewFacePage #onStop").style.display = "flex";
-            faceImages.forEach(face => {
-                const img = document.createElement("img");
-                img.src = face.toDataURL();
-                img.draggable = true;
-                $("#rest").append(img);
-
-                img.addEventListener('dragstart', (ev) => {
-                    ev.dataTransfer.setData("text", JSON.stringify([ev.target.parentElement.id, Array.from(ev.target.parentElement.children).indexOf(ev.target)]));
-                })
-                img.addEventListener('dblclick', event => {
-                    const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
-                    newParent.appendChild(event.target);
-                });
-                
-                img.addEventListener('touchstart', event => {
-                    const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
-                    newParent.appendChild(event.target);
-                });
-            });
-            const collection = await firebase.firestore().collection("users").get();
-            const datalist = $("datalist");
-            collection.docs.forEach(doc => {
-                const option = document.createElement("option");
-                option.innerText = doc.id;
-                datalist.append(option);
-            })
-
-        }
-
-        document.addEventListener('dragover', (ev) => {
-            ev.preventDefault();
-        })
-        $("#selected").addEventListener('drop', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            const [id, index] = JSON.parse(ev.dataTransfer.getData("text"));
-            const parent = $("#" + id);
-            const elem = parent.children[index];
-            $("#selected").appendChild(elem);
-        })
-        $("#rest").addEventListener('drop', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            const [id, index] = JSON.parse(ev.dataTransfer.getData("text"));
-            const parent = $("#" + id);
-            const elem = parent.children[index];
-            $("#rest").appendChild(elem);
-        })
-
-        $("#uploadImages").addEventListener('click', async (event) => {
-
-            const name = $("#selected input").value;
-            const images = $all("#selected img");
-            let left = images.length;
-            const firestore = firebase.firestore();
-            if (name.length == 0)
-                return alert("Please enter name");
-            const result = await firestore.doc("users/" + name).get();
-            if (images.length == 0)
-                alert("Please select images");
-            event.target.innerText = "Saving...";
-            if (!result.exists)
-                await firestore.doc("users/" + name).set({
-                    name,
-                    createdAt: Date()
-                });
-            images.forEach(async (img, index) => {
-                const doc = await firestore.collection("faces").add({
-                    name: name,
-                    createdAt: Date(),
-                    userAgent: navigator.userAgent,
-                    width: img.width,
-                    height: img.height
-                });
-                const canvas = document.createElement("canvas");
-                const ctx = canvas.getContext("2d");
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.width);
-                canvas.toBlob(async (blob) => {
-                    const ref = firebase.storage().ref().child(`faces/${name}/${doc.id}.png`);
-                    await ref.put(blob);
-                    img.style.transform = "scale(0,0) rotate(360deg)";
-                    left--;
-                    setTimeout(() => {
-                        img.remove();
-                    }, 500);
-                    if (left == 0) {
-                        event.target.innerText = "Save";
-                        $("#selected input").value = "";
-                    }
-
-                }, 'image/png');
-            });
-
-        });
-
-        async function initFacialRecognition() {
-            $("#recognizePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models... might take longer to load the first time, please bare with me :)";
-            await faceapi.nets.ssdMobilenetv1.load('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading FaceRecognition models... might take longer to load the first time, please bare with me :)";
-            await faceapi.loadFaceRecognitionModel('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmark models... might take longer to load the first time, please bare with me :)";
-            await faceapi.loadFaceLandmarkModel('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmarkTiny models... might take longer to load the first time, please bare with me :)";
-            await faceapi.loadFaceLandmarkTinyModel('/models')
-            $("#recognizePage .loadingStatus").innerText = "Loading users... ";
-            const firestore = firebase.firestore();
-            const storage = firebase.storage();
-            const users = await firestore.collection("users").get();
-            let done = 0;
-            const userLabels = await Promise.all(users.docs.map(async doc => {
-                try {
-                    $("#recognizePage .loadingStatus").innerText = "Loading faces for " + (done++) + "/"+users.docs.length+"...";
-                    let faces = await firestore.collection("faces").where("name", '==', doc.id).get();
-                    const descriptors = await Promise.all(faces.docs.map(async doc => {
-                        try {
-                            let url = await storage.ref("/").child(`faces/${doc.data().name}/${doc.id}.png`).getDownloadURL();
-                            let img = await faceapi.fetchImage(url);
-                            return await faceapi.computeFaceDescriptor(img);
-                        }
-                        catch (err) { console.log(err) }
-                    }));
-                    return new faceapi.LabeledFaceDescriptors(doc.id, descriptors);
-                }
-                catch (err) { console.log(err) }
-            }));
-            const faceMatcher = new faceapi.FaceMatcher(userLabels);
-            $("#recognizePage .loadingStatus").innerText = "Loading video... make sure you have given access to camera ";
-            navigator.getUserMedia(
-                { video: {} },
-                stream => {
-                    $("#recognizePage video").srcObject = stream;
-                    flags.detectFaces=true;
-                    $("#recognizePage video").play();
-
-                    $("#recognizePage video").addEventListener('play', runFacialRecognition);
-                },
-                err => console.error(err)
-            );
-            async function runFacialRecognition() {
-                const video = $("#recognizePage video");
-                const img = $("#recognizePage img");
-                video.style.transform = "scale(0,0)"
-                video.style.position = "fixed"
                 const canvas = document.createElement("canvas");
                 canvas.width = video.clientWidth;
                 canvas.height = video.clientHeight;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, video.clientWidth, video.clientHeight);
                 const options = getFaceDetectorOptions();
-                $("#recognizePageOnLoad").style.visibility = "visible";
-                if (img.width == 0)
-                    img.src = canvas.toDataURL();
-                $("#recognizePage .loadingStatus").style.display = "none";
+                $("#addNewFaceOnLoad").style.visibility = "visible";
 
-                const faceData = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
-                if(faceData){
-                    const bestMatch = faceMatcher.findBestMatch(faceData.descriptor);
-                    const { x, y, width, height } = faceData.detection.box;
-                    ctx.rect(x, y, width, height);
-                    ctx.strokeStyle="#fff"
-                    ctx.stroke();
-                    ctx.font = "16px Arial";
-                    ctx.fillStyle="#fff";                    
-                    ctx.fillText(bestMatch.label, x+(width/2), y);
-                }
+
                 img.src = canvas.toDataURL();
+                $("#addNewFacePage .loadingStatus").style.display = "none";
+                const detections = await faceapi.detectAllFaces(img, options);
+                collectFaces(img, detections);
+                const canvas2 = $("#addNewFacePage canvas");
+                canvas2.width = video.clientWidth;
+                canvas2.height = video.clientHeight;
+                const ctx2 = canvas2.getContext('2d');
+                detections.forEach(faces => {
+                    try {
+                        let { x, y, width, height } = faces.box;
+                        ctx2.rect(x, y, width, height);
+                        ctx2.stroke();
+                    }
+                    catch (err) {
+                    
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                })
+
                 if (flags.detectFaces)
-                    requestAnimationFrame(runFacialRecognition);
+                    requestAnimationFrame(detectFaces);
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
             }
         }
-        function initFeedback(){}
-        $("#feedbackPage button").addEventListener('click',async ()=>{
-            $("#feedbackPage button").innerText="Sending the raven...";
-            let name = $("#feedbackPage input").value;
-            let message = $("#feedbackPage textarea").value;
-            await firebase.firestore().collection("feedbacks").add({
-                name,
-                message,
-                time:Date(),
-                userAgent:navigator.userAgent
-            })
-            $("#feedbackPage input").value="";
-            $("#feedbackPage textarea").value="";
-            $("#feedbackPage button").innerText="Thank you for your feedback";
 
+        async function collectFaces(img, detections) {
+            try {
+                const faces = await faceapi.extractFaces(img, detections);
+                faces.forEach(face => {
+                    try {
+                        convertToGrayscale(face);
+                        faceImages.push(face);
+                        $("#face-count").innerText = faceImages.length;
+                    }
+                    catch (err) {
+                    
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                });
+            }
+            catch (err) {
             
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+        }
+
+        function convertToGrayscale(face) {
+            try {
+                const ctx = face.getContext('2d');
+                let colored = ctx.getImageData(0, 0, face.width, face.height);
+                let grayscaled = ctx.createImageData(face.width, face.height);
+                let length = colored.data.length;
+
+                // convert by iterating over each pixel each representing RGBA
+                for (let i = 0; i < length; i += 4) {
+                    // calculate luma, here using Rec 709
+                    let luma = colored.data[i] * 0.2126 + colored.data[i + 1] * 0.7152 + colored.data[i + 2] * 0.0722;
+                    // update target's RGB using the same luma value for all channels
+                    grayscaled.data[i] = grayscaled.data[i + 1] = grayscaled.data[i + 2] = luma;
+                    grayscaled.data[i + 3] = colored.data[i + 3];                            // copy alpha
+                }
+                // put back luma data so we can save it as image
+                ctx.putImageData(grayscaled, 0, 0);
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+
+        }
+        async function viewFaces() {
+            try {
+                $("#addNewFaceOnLoad").style.display = "none";
+                $("#addNewFacePage #onStop").style.display = "flex";
+                faceImages.forEach(face => {
+                    try {
+                        const img = document.createElement("img");
+                        img.src = face.toDataURL();
+                        img.draggable = true;
+                        $("#rest").append(img);
+
+                        img.addEventListener('dragstart', (ev) => {
+                            try {
+                                ev.dataTransfer.setData("text", JSON.stringify([ev.target.parentElement.id, Array.from(ev.target.parentElement.children).indexOf(ev.target)]));
+                            }
+                            catch (err) {
+                            
+                                reportError({ error: err, message: err.message }, (new Error).stack);
+                            }
+                        })
+                        img.addEventListener('dblclick', event => {
+                            try {
+                                const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
+                                newParent.appendChild(event.target);
+                            }
+                            catch (err) {
+                            
+                                reportError({ error: err, message: err.message }, (new Error).stack);
+                            }
+                        });
+
+                        img.addEventListener('touchstart', event => {
+                            try {
+                                const newParent = event.target.parentElement.id == "selected" ? $("#rest") : $("#selected");
+                                newParent.appendChild(event.target);
+                            }
+                            catch (err) {
+                            
+                                reportError({ error: err, message: err.message }, (new Error).stack);
+                            }
+                        });
+                    }
+                    catch (err) {
+                    
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                });
+                const collection = await firebase.firestore().collection("users").get();
+                const datalist = $("datalist");
+                collection.docs.forEach(doc => {
+                    try {
+                        const option = document.createElement("option");
+                        option.innerText = doc.id;
+                        datalist.append(option);
+                    }
+                    catch (err) {
+                    
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                })
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+
+        }
+
+        document.addEventListener('dragover', (ev) => {
+            ev.preventDefault();
+        })
+
+        $("#selected").addEventListener('drop', (ev) => {
+            try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const [id, index] = JSON.parse(ev.dataTransfer.getData("text"));
+                const parent = $("#" + id);
+                const elem = parent.children[index];
+                $("#selected").appendChild(elem);
+
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+        })
+        $("#rest").addEventListener('drop', (ev) => {
+            try {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const [id, index] = JSON.parse(ev.dataTransfer.getData("text"));
+                const parent = $("#" + id);
+                const elem = parent.children[index];
+                $("#rest").appendChild(elem);
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+        })
+
+        $("#uploadImages").addEventListener('click', async (event) => {
+            try {
+                const name = $("#selected input").value;
+                const images = $all("#selected img");
+                let left = images.length;
+                const firestore = firebase.firestore();
+                if (name.length == 0)
+                    return alert("Please enter name");
+                const result = await firestore.doc("users/" + name).get();
+                if (images.length == 0)
+                    alert("Please select images");
+                event.target.innerText = "Saving...";
+                if (!result.exists)
+                    await firestore.doc("users/" + name).set({
+                        name,
+                        createdAt: Date()
+                    });
+                images.forEach(async (img, index) => {
+                    try {
+                        const doc = await firestore.collection("faces").add({
+                            name: name,
+                            createdAt: Date(),
+                            userAgent: navigator.userAgent,
+                            width: img.width,
+                            height: img.height
+                        });
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.width);
+                        canvas.toBlob(async (blob) => {
+                            try {
+                                const ref = firebase.storage().ref().child(`faces/${name}/${doc.id}.png`);
+                                await ref.put(blob);
+                                img.style.transform = "scale(0,0) rotate(360deg)";
+                                left--;
+                                setTimeout(() => {
+                                    img.remove();
+                                }, 500);
+                                if (left == 0) {
+                                    event.target.innerText = "Save";
+                                    $("#selected input").value = "";
+                                }
+                            }
+                            catch (err) {
+                            
+                                reportError({ error: err, message: err.message }, (new Error).stack);
+                            }
+                        }, 'image/png');
+                    }
+                    catch (err) {
+                    
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                });
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
         });
+
+        async function initFacialRecognition() {
+            try {
+                $("#recognizePage .loadingStatus").innerText = "Loading ssdMobilenetv1 models... might take longer to load the first time, please bare with me :)";
+                await preload('ssd_mobilenetv1', $("#recognizePage .loadingStatus"));
+                await faceapi.nets.ssdMobilenetv1.load('/models')
+                $("#recognizePage .loadingStatus").innerText = "Loading FaceRecognition models... might take longer to load the first time, please bare with me :)";
+                await preload('face_recognition', $("#recognizePage .loadingStatus"));
+                await faceapi.loadFaceRecognitionModel('/models')
+                $("#recognizePage .loadingStatus").innerText = "Loading FaceLandmark models... might take longer to load the first time, please bare with me :)";
+                await preload('face_landmark', $("#recognizePage .loadingStatus"));
+                await faceapi.loadFaceLandmarkModel('/models')
+                $("#recognizePage .loadingStatus").innerText = "Loading users... ";
+                const firestore = firebase.firestore();
+                const storage = firebase.storage();
+                const users = await firestore.collection("users").get();
+                let done = 0;
+                let total = 0;
+                const userLabels = await Promise.all(users.docs.map(async doc => {
+                    try {
+                        let faces = await firestore.collection("faces").where("name", '==', doc.id).get();
+                        total += faces.docs.length;
+                        const descriptors = await Promise.all(faces.docs.map(async doc => {
+
+                            try {
+                                let url = await storage.ref("/").child(`faces/${doc.data().name}/${doc.id}.png`).getDownloadURL();
+                                let img = await faceapi.fetchImage(url);
+                                $("#recognizePage .loadingStatus").innerText = "Loading faces " + (done++) + "/" + total + "...";
+
+                                return await faceapi.computeFaceDescriptor(img);
+                            }
+                            catch (err) {  reportError({ error: err, message: err.message }, (new Error).stack); }
+                        }));
+                        return new faceapi.LabeledFaceDescriptors(doc.id, descriptors);
+                    }
+                    catch (err) {  reportError({ error: err, message: err.message }, (new Error).stack); }
+                }));
+                const faceMatcher = new faceapi.FaceMatcher(userLabels);
+                $("#recognizePage .loadingStatus").innerText = "Loading video... might take few seconds, make sure you have given access to camera ";
+                const stream = await navigator.mediaDevices.getUserMedia(options);
+
+                $("#recognizePage video").srcObject = stream;
+                flags.detectFaces = true;
+                $("#recognizePage video").play();
+
+                $("#recognizePage video").addEventListener('play', runFacialRecognition);
+                async function runFacialRecognition() {
+                    try {
+                        const video = $("#recognizePage video");
+                        //video.style.transform = "scale(0,0)"
+                        //video.style.position = "fixed"
+                        const canvas = document.createElement("canvas");
+                        canvas.width = video.clientWidth;
+                        canvas.height = video.clientHeight;
+                        const img = new Image(canvas.width, canvas.height);
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, video.clientWidth, video.clientHeight);
+                        const options = getFaceDetectorOptions();
+                        $("#recognizePageOnLoad").style.visibility = "visible";
+
+                        img.src = canvas.toDataURL();
+                        $("#recognizePage .loadingStatus").style.display = "none";
+
+                        const faceData = await faceapi.detectSingleFace(canvas).withFaceLandmarks().withFaceDescriptor();
+                        const canvas2 = $("#recognizePage canvas");
+                        canvas2.width = video.clientWidth;
+                        canvas2.height = video.clientHeight;
+                        const ctx2 = canvas2.getContext('2d');
+                        if (faceData) {
+                            const bestMatch = faceMatcher.findBestMatch(faceData.descriptor);
+                            const { x, y, width, height } = faceData.detection.box;
+                            ctx2.rect(x, y, width, height);
+                            ctx2.strokeStyle = "#fff"
+                            ctx2.stroke();
+                            ctx2.font = "16px Arial";
+                            ctx2.fillStyle = "#fff";
+                            ctx2.fillText(bestMatch.label, x + (width / 2), y);
+                        }
+
+                        if (flags.detectFaces)
+                            requestAnimationFrame(runFacialRecognition);
+                    }
+                    catch (err) {
+                        reportError({ error: err, message: err.message }, (new Error).stack);
+                    }
+                }
+
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+        }
+
+        function initFeedback() { }
+
+        $("#feedbackPage button").addEventListener('click', async () => {
+            try {
+                $("#feedbackPage button").innerText = "Sending the raven...";
+                let name = $("#feedbackPage input").value;
+                let message = $("#feedbackPage textarea").value;
+                await firebase.firestore().collection("feedbacks").add({
+                    name,
+                    message,
+                    time: Date(),
+                    userAgent: navigator.userAgent
+                })
+                $("#feedbackPage input").value = "";
+                $("#feedbackPage textarea").value = "";
+                $("#feedbackPage button").innerText = "Thank you for your feedback";
+            }
+            catch (err) {
+            
+                reportError({ error: err, message: err.message }, (new Error).stack);
+            }
+
+        });
+        $("#loader").style.opacity = 0;
+        setTimeout(() => { $("#loader").style.display = "none" }, 500)
     </script>
 </body>
 
