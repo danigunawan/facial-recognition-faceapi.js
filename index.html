@@ -306,6 +306,10 @@
             reportError({ message, source, lineno, colno });
 
         };
+
+        if(navigator.userAgent.match(/MiuiBrowser/))
+            alert("Please use google chrome as miui browser blocks camera access");
+
         const $ = (selector) => document.querySelector(selector);
         const $all = (selector) => document.querySelectorAll(selector);
         const constructors = {
@@ -427,6 +431,7 @@
                 await faceapi.nets.ssdMobilenetv1.load('/models');
                 $("#addNewFacePage .loadingStatus").innerText = "Loading video... might take few seconds, make sure you have given access to camera";
                 const stream = await navigator.mediaDevices.getUserMedia(options);
+                $("#addNewFacePage video").setAttribute("playsinline", true);
                 $("#addNewFacePage video").srcObject = stream;
                 $("#addNewFacePage video").play();
                 flags.detectFaces = true;
@@ -744,7 +749,7 @@
                 const faceMatcher = new faceapi.FaceMatcher(userLabels);
                 $("#recognizePage .loadingStatus").innerText = "Loading video... might take few seconds, make sure you have given access to camera ";
                 const stream = await navigator.mediaDevices.getUserMedia(options);
-
+                $("#recognizePage video").setAttribute("playsinline", true);
                 $("#recognizePage video").srcObject = stream;
                 flags.detectFaces = true;
                 $("#recognizePage video").play();
